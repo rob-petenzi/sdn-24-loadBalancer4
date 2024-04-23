@@ -74,24 +74,3 @@ class SimpleMonitor13(simple_switch_13.SimpleSwitch13):
       bandwidth = stat.rx_bytes + stat.tx_bytes
       switch_bandwidth[port_no] = bandwidth
       return switch_bandwidth
-           
-  # Build network graph
-  def find_next_hop_to_destination(self,source_id,destination_id):
-    net = nx.DiGraph()
-    for link in get_all_link(self):
-      net.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
-
-    # Draw graph
-    nx.draw()
-    plt.show()
-    
-    path = nx.shortest_path(
-      net,
-      source_id,
-      destination_id
-    )
-
-    first_link = net[ path[0] ][ path[1] ]
-
-    return first_link['port']
-

@@ -11,22 +11,22 @@ class SimpleMonitor13(simple_switch_13.SimpleSwitch13):
         self.datapaths = {}
         self.monitor_thread = hub.spawn(self._monitor)
 
-# Fills controller table with currently connected switches (dynamic)
-@set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
-def _state_change_handler(self, ev):
-    datapath = ev.datapath  # Extract the datapath object from the event
-    if ev.state == MAIN_DISPATCHER:
-        # Handler for when the datapath (switch) transitions to MAIN_DISPATCHER state -> connected
-        if datapath.id not in self.datapaths:
-            # Check if the datapath is not already registered
-            self.logger.debug('register datapath: %016x', datapath.id)
-            self.datapaths[datapath.id] = datapath  # Register the datapath in a dictionary
-    elif ev.state == DEAD_DISPATCHER:
-        # Handler for when the datapath (switch) transitions to DEAD_DISPATCHER state -> disconnected
-        if datapath.id in self.datapaths:
-            # Check if the datapath is currently registered
-            self.logger.debug('unregister datapath: %016x', datapath.id)
-            del self.datapaths[datapath.id]  # Unregister and remove the datapath from the dictionary
+    # Fills controller table with currently connected switches (dynamic)
+    @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    def _state_change_handler(self, ev):
+        datapath = ev.datapath  # Extract the datapath object from the event
+        if ev.state == MAIN_DISPATCHER:
+            # Handler for when the datapath (switch) transitions to MAIN_DISPATCHER state -> connected
+            if datapath.id not in self.datapaths:
+                # Check if the datapath is not already registered
+                self.logger.debug('register datapath: %016x', datapath.id)
+                self.datapaths[datapath.id] = datapath  # Register the datapath in a dictionary
+        elif ev.state == DEAD_DISPATCHER:
+            # Handler for when the datapath (switch) transitions to DEAD_DISPATCHER state -> disconnected
+            if datapath.id in self.datapaths:
+                # Check if the datapath is currently registered
+                self.logger.debug('unregister datapath: %016x', datapath.id)
+                del self.datapaths[datapath.id]  # Unregister and remove the datapath from the dictionary
     
     # Asks for stats for all switches each sleep_timer
     def _monitor(self):
