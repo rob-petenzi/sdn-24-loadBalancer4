@@ -84,7 +84,7 @@ class SimpleSwitch13(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         msg = ev.msg
-        print "#############################################"
+        print("#############################################")
         datapath = msg.datapath
         dpid = datapath.id
 
