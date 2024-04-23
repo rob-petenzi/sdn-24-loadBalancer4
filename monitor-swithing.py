@@ -115,7 +115,13 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         print("##########################")
         print("### Metric dict status for Switch {} ###".format(switch))
         print("##########################")
+
+        port_traffic_items = iter(self.metrics[switch].items())  # Create an iterator over the dictionary items
+        next(port_traffic_items, None)  # Skip the first entry
+
         for port, traffic in self.metrics[switch].items():
+            if port > 100:
+                continue  # Skip the print statement if the port number is greater than 100
             print("Port {}: {}".format(port, traffic))
         print("\n")
 
@@ -124,6 +130,8 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         print("### Deltas dict status for Switch {} ###".format(switch))
         print("##########################")
         for port, delta in self.deltas[switch].items():
+            if port > 100:
+                continue  # Skip the print statement if the port number is greater than 100
             print("Delta Port {}: {}".format(port, delta))
         print("\n")
 
