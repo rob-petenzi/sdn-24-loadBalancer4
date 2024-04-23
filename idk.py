@@ -3,7 +3,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
-from ryu.lib.packet import packet, ethernet, ether_types
+from ryu.lib.packet import packet, ethernet, ether_types, ipv4, icmp
 import time
 
 class PsrSwitch(app_manager.RyuApp):
@@ -66,6 +66,15 @@ class PsrSwitch(app_manager.RyuApp):
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             return
 
+        # Handle ICMP packets separately
+        if eth.ethertype == ether_types.ETH_TYPE_IP:
+            ip_pkt = pkt.get_protocol(ipv4.ipv4)
+            if ip_pkt and ip_pkt.proto == ipv4.IPPROTO_ICMP:
+                icmp_pkt = pkt.get_protocol(icmp.icmp)
+                if icmp_pkt:
+                    self.handle_icmp_packet(datapath, pkt, in_port)
+                    return
+
         # Initialize visited switches list for this packet
         if src not in self.visited_switches:
             self.visited_switches[src] = []
@@ -122,6 +131,20 @@ class PsrSwitch(app_manager.RyuApp):
                 instructions=inst,
             )
             datapath.send_msg(ofmsg)
+
+    def handle_icmp_packet(self, datapath, pkt, in_port):
+        # Flood ICMP packets
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
+        out = parser.OFPPacketOut(
+            datapath=datapath,
+            buffer_id=ofproto.OFP_NO_BUFFER,
+            in_port=in_port,
+            actions=actions,
+            data=pkt.data
+        )
+        datapath.send_msg(out)
 
     def get_least_loaded_port(self, datapath):
         # Check if it's time to update link loads
