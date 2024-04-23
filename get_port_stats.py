@@ -87,15 +87,20 @@ class SimpleMonitor13(simple_switch_13.SimpleSwitch13):
         self.metrics[switch_id].update(port_traffic)
 
   def periodic_print(self):
-    print("Metric dict status: ")
+    print("##########################")
+    print("### Metric dict status ###")
+    print("##########################")
     for switch, port_traffic in self.metrics.items():
       port1 = port_traffic[1]
       port2 = port_traffic[2]
       self.logger.info(f"Switch {switch}: port1 = {port1}, port2 = {port2}")
       self.logger.info("-------------------")
+    print("\n")
       
   def periodic_print_deltas(self):
-    print("Deltas dict status: ")
+    print("##########################")
+    print("### Deltas dict status ###")
+    print("##########################")
     for switch, port_traffic in self.deltas.items():
       port1 = port_traffic[1]
       port2 = port_traffic[2]
@@ -108,5 +113,7 @@ class SimpleMonitor13(simple_switch_13.SimpleSwitch13):
     switch_deltas = copy.deepcopy(self.metrics[switch])
     for port in new_values.keys():
       switch_deltas[port] = new_values[port] - old_values[port]
-    
-    self.deltas[switch].update(switch_deltas)
+    if switch not in self.deltas.keys():
+      self.deltas[switch] = switch_deltas
+    else:
+      self.deltas[switch].update(switch_deltas)
