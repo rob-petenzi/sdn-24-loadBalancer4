@@ -15,6 +15,7 @@ class PsrSwitch(app_manager.RyuApp):
         self.link_loads = {}
         self.monitor_interval = 10  # Monitoring interval in seconds
         self.last_monitor_time = time.time()
+        self.visited_switches = {}  # Dictionary to store visited switches for each packet
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -63,6 +64,18 @@ class PsrSwitch(app_manager.RyuApp):
         src = eth.src
 
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+            return
+
+        # Initialize visited switches list for this packet
+        if src not in self.visited_switches:
+            self.visited_switches[src] = []
+
+        # Add current switch to visited switches list for this packet
+        self.visited_switches[src].append(dpid)
+
+        # Check if packet has visited this switch before
+        if dpid in self.visited_switches[src]:
+            # If packet has visited this switch before, drop the packet to avoid loops
             return
 
         self.mac_to_port[dpid][src] = in_port
