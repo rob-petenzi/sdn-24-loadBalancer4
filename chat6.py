@@ -59,61 +59,59 @@ class PsrSwitch(app_manager.RyuApp):
         datapath.send_msg(mod)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
-    def _packet_in_handler(self, ev):
-        msg = ev.msg
-        datapath = msg.datapath
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-        in_port = msg.match['in_port']
-        dpid = datapath.id
+def _packet_in_handler(self, ev):
+    msg = ev.msg
+    datapath = msg.datapath
+    ofproto = datapath.ofproto
+    parser = datapath.ofproto_parser
+    in_port = msg.match['in_port']
+    dpid = datapath.id
 
-        pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocol(ethernet.ethernet)
+    pkt = packet.Packet(msg.data)
+    eth = pkt.get_protocol(ethernet.ethernet)
 
-        assert eth is not None
+    assert eth is not None
 
-        if eth.ethertype == ether_types.ETH_TYPE_LLDP:
-            return
+    if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+        return
 
-        src = eth.src
+    src = eth.src
 
-        # Update port load
-        self.port_load.setdefault(in_port, 0)
-        self.port_load[in_port] += 1
+    # Update port load
+    self.port_load.setdefault(in_port, 0)
+    self.port_load[in_port] += 1
 
-        # Update MAC to port mapping
-        self.mac_to_port[src] = in_port
+    # Update MAC to port mapping
+    self.mac_to_port[src] = in_port
 
-        # Forwarding decision
-        if src not in self.mac_to_port:
-            # Add source address to table 0
-            match = parser.OFPMatch(eth_src=src)
-            inst = [
-                parser.OFPInstructionGotoTable(1)
-            ]
-            mod = parser.OFPFlowMod(
-                datapath=datapath,
-                table_id=0,
-                priority=1,
-                match=match,
-                instructions=inst
-            )
-            datapath.send_msg(mod)
-
-        # Choose the least loaded path for forwarding
-        least_loaded_port = min(self.port_load, key=self.port_load.get)
-        out_port = least_loaded_port
-
-        # Forward packet
-        actions = [parser.OFPActionOutput(out_port)]
-        data = None
-        if msg.buffer_id == ofproto.OFP_NO_BUFFER:
-            data = msg.data
+    # Forwarding decision
+    if src not in self.mac_to_port:
+        # Forward packet to controller for unknown source addresses
+        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         out = parser.OFPPacketOut(
             datapath=datapath,
             buffer_id=msg.buffer_id,
             in_port=in_port,
             actions=actions,
-            data=data
+            data=msg.data
         )
         datapath.send_msg(out)
+        return
+
+    # Choose the least loaded path for forwarding
+    least_loaded_port = min(self.port_load, key=self.port_load.get)
+    out_port = least_loaded_port
+
+    # Forward packet
+    actions = [parser.OFPActionOutput(out_port)]
+    data = None
+    if msg.buffer_id == ofproto.OFP_NO_BUFFER:
+        data = msg.data
+    out = parser.OFPPacketOut(
+        datapath=datapath,
+        buffer_id=msg.buffer_id,
+        in_port=in_port,
+        actions=actions,
+        data=data
+    )
+    datapath.send_msg(out)
