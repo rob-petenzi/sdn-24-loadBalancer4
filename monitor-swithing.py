@@ -4,12 +4,14 @@ from ryu.controller.handler import set_ev_cls, MAIN_DISPATCHER, DEAD_DISPATCHER,
 from ryu.ofproto import ofproto_v1_3
 from ryu.topology import event, switches
 from ryu.topology.api import get_all_switch, get_all_link, get_all_host
-from ryu.lib.packet import packet, ethernet, ether_types, arp
+from ryu.lib.packet import packet, ethernet, ether_types, arp, ipv4, tcp
 from ryu.app import simple_switch_13
 from ryu.lib import hub
 from operator import attrgetter
 import networkx as nx
 import copy
+from ryu.ofproto import inet
+
 
 class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -66,15 +68,8 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         in_port = msg.match['in_port']
 
         pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocol(ethernet.ethernet)
+        eth = pkt.get_protocol(ethernet.ethernet)    
 
-        if eth.ethertype == ether_types.ETH_TYPE_IPV6:
-            match = parser.OFPMatch(eth_type = ether_types.ETH_TYPE_IPV6)
-            actions = []
-            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
-            mod = parser.OFPFlowMod(datapath=datapath, priority=10, match=match, instructions=inst)
-            datapath.send_msg(mod)
-            
         if eth.ethertype == ether_types.ETH_TYPE_ARP:
             self.proxy_arp(msg)
             return
@@ -92,14 +87,25 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
             output_port = dst_port
         else:
             output_port = self.find_next_hop_to_destination(datapath.id, dst_dpid)
+        
+        ip = pkt.get_protocol(ipv4.ipv4)
+        
+        if ip.proto != ipv4.tcp:
+            match = parser.OFPMatch(eth_dst=destination_mac)
+            priority = 10
+        else:
+            tcpinfo = pkt.get_protocol(tcp.tcp)
+            priority = 20
+            match = parser.OFPMatch(eth_dst=destination_mac, ip_proto=inet.IPPROTO_TCP, ipv4_src=ip.src, ipv4_dst=ip.dst, tcp_src=tcpinfo.src_port, tcp_dst=tcpinfo.dst_port)
+            
+        
 
         actions = [parser.OFPActionOutput(output_port)]
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port, actions=actions, data=msg.data)
         datapath.send_msg(out)
 
-        match = parser.OFPMatch(eth_dst=destination_mac)
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, [parser.OFPActionOutput(output_port)])]
-        mod = parser.OFPFlowMod(datapath=datapath, priority=10, match=match, instructions=inst, buffer_id=msg.buffer_id)
+        mod = parser.OFPFlowMod(datapath=datapath, priority=priority, match=match, instructions=inst, buffer_id=msg.buffer_id)
         datapath.send_msg(mod)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
