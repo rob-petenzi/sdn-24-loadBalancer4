@@ -68,6 +68,13 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
 
+        if eth.ethertype == ether_types.ETH_TYPE_IPV6:
+            match = parser.OFPMatch(eth_type = ether_types.ETH_TYPE_IPV6)
+            actions = []
+            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+            mod = parser.OFPFlowMod(datapath=datapath, priority=10, match=match, instructions=inst)
+            datapath.send_msg(mod)
+            
         if eth.ethertype == ether_types.ETH_TYPE_ARP:
             self.proxy_arp(msg)
             return
@@ -176,7 +183,7 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
     def find_next_hop_to_destination(self, source_id, destination_id):
         net = nx.DiGraph()
         for link in get_all_link(self):
-            net.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no)
+            net.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no, weight=self.deltas[link.src.dpid].get(link.src.port_no))
         path = nx.shortest_path(net, source_id, destination_id)
         first_link = net[path[0]][path[1]]
         return first_link['port']
