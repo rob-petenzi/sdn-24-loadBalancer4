@@ -83,45 +83,46 @@ class PsrSwitch(app_manager.RyuApp):
         # Return a list of neighboring switch DPIDs
         pass
 
-    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
-    def _packet_in_handler(self, ev):
-        msg = ev.msg
-        datapath = msg.datapath
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-        in_port = msg.match['in_port']
+   @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+def _packet_in_handler(self, ev):
+    msg = ev.msg
+    datapath = msg.datapath
+    ofproto = datapath.ofproto
+    parser = datapath.ofproto_parser
+    in_port = msg.match['in_port']
 
-        pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocol(ethernet.ethernet)
+    pkt = packet.Packet(msg.data)
+    eth = pkt.get_protocol(ethernet.ethernet)
 
-        assert eth is not None
+    assert eth is not None
 
-        if eth.ethertype == ether_types.ETH_TYPE_LLDP:
-            return
+    if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+        return
 
-        src = eth.src
-        dst = eth.dst
+    src = eth.src
+    dst = eth.dst
 
-        # Learn MAC to port mapping
-        self.mac_to_port[src] = in_port
+    # Learn MAC to port mapping
+    self.mac_to_port[src] = in_port
 
-        # Forwarding decision
-        if dst in self.mac_to_port:
-            out_port = self.mac_to_port[dst]
-        else:
-            # If destination MAC address is unknown, flood packet to neighbors
-            # Implement logic to forward packet to neighboring switches
-            out_port = ofproto.OFPP_FLOOD
+    # Forwarding decision
+    if dst in self.mac_to_port:
+        out_port = self.mac_to_port[dst]
+    else:
+        # If destination MAC address is unknown, forward packet to neighbors
+        neighbors = self.switch_neighbors[datapath.id]
+        out_ports = [port for port in range(1, 5) if port != in_port]
+        out_port = neighbors[out_ports.index(min(out_ports))]
 
-        actions = [parser.OFPActionOutput(out_port)]
-        data = None
-        if msg.buffer_id == ofproto.OFP_NO_BUFFER:
-            data = msg.data
-        out = parser.OFPPacketOut(
-            datapath=datapath,
-            buffer_id=msg.buffer_id,
-            in_port=in_port,
-            actions=actions,
-            data=data
-        )
-        datapath.send_msg(out)
+    actions = [parser.OFPActionOutput(out_port)]
+    data = None
+    if msg.buffer_id == ofproto.OFP_NO_BUFFER:
+        data = msg.data
+    out = parser.OFPPacketOut(
+        datapath=datapath,
+        buffer_id=msg.buffer_id,
+        in_port=in_port,
+        actions=actions,
+        data=data
+    )
+    datapath.send_msg(out)
