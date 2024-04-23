@@ -21,7 +21,7 @@ class TBTopo(Topo):
         self.addLink(minihost1, SDN_switch1, port2 = 1,cls=TCLink, bw=100)
         self.addLink(minihost2, SDN_switch4, port2 = 1,cls=TCLink, bw=100)
         self.addLink(minihost3, SDN_switch5, port2 = 1,cls=TCLink, bw=100)
-        self.addLink(SDN_switch6, SDN_switch3, port1=1,cls=TCLink, port2=1, bw=100)
+        self.addLink(SDN_switch6, SDN_switch3, port1=1,port2=1,cls=TCLink, bw=100)
         
         self.addLink(SDN_switch1, SDN_switch2, 2, 2,cls=TCLink, bw=100)
         self.addLink(SDN_switch2, SDN_switch3, 3, 3,cls=TCLink, bw=100)
