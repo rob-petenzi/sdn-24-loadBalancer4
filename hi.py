@@ -14,9 +14,9 @@ class SDNController(app_manager.RyuApp):
         super(SDNController, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.graph = {}
+        self.discover_topology()
 
-    @set_ev_cls(event.EventSwitchEnter)
-    def get_topology_data(self, ev):
+    def discover_topology(self):
         switch_list = get_switch(self, None)
         switches = [switch.dp.id for switch in switch_list]
         self.graph = {dpid: {} for dpid in switches}
@@ -26,6 +26,7 @@ class SDNController(app_manager.RyuApp):
             src = link.src.dpid
             dst = link.dst.dpid
             self.graph[src][dst] = link
+            self.graph[dst][src] = link
             self.graph[dst][src] = link
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
