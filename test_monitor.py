@@ -30,7 +30,7 @@ def _state_change_handler(self, ev):
     
     # Asks for stats for all switches each sleep_timer
     def _monitor(self):
-        sleep_timer = 30;
+        sleep_timer = 30
         while True:
             for dp in self.datapaths.values():
                 self._request_stats(dp)
@@ -52,19 +52,6 @@ def _state_change_handler(self, ev):
         # Request statistics for all ports (port_no=0) using OFPP_ANY
         req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
         datapath.send_msg(req)
-
-    # @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
-    # def _flow_stats_reply_handler(self, ev):
-    #     body = ev.msg.body
-    #     self.logger.info('datapath in-port eth-dst out-port packets bytes')
-    #     self.logger.info('---------------- -------- ----------------- -------- -------- --------')
-    #     for stat in sorted([flow for flow in body if flow.priority == 1],
-    #                        key=lambda flow: (flow.match['in_port'], flow.match['eth_dst'])):
-    #         self.logger.info('%016x %8x %17s %8x %8d %8d',
-    #                          ev.msg.datapath.id,
-    #                          stat.match['in_port'], stat.match['eth_dst'],
-    #                          stat.instructions[0].actions[0].port,
-    #                          stat.packet_count, stat.byte_count)
 
     # Handle replies for each switch
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
