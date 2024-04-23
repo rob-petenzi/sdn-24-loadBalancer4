@@ -1,18 +1,22 @@
-from ryu.base import app_manager
-import matplotlib.pyplot as plt
+from ryu.app import simple_switch_13
 from ryu.controller import ofp_event
-from ryu.controller.handler import set_ev_cls, CONFIG_DISPATCHER, MAIN_DISPATCHER, DEAD_DISPATCHER
-from ryu.ofproto import ofproto_v1_3
-from ryu.topology import event, switches
-from ryu.topology.api import get_all_switch, get_all_link, get_all_host
-from ryu.lib.packet import packet, ethernet, ether_types, arp
-import networkx as nx
+from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
+from ryu.controller.handler import set_ev_cls
+from ryu.lib import hub
+import json
+import time
+from operator import attrgetter
+import copy
 
 class SimpleMonitor13(simple_switch_13.SimpleSwitch13):
+  metrics = {}
+  deltas = {}
   def __init__(self, *args, **kwargs):
     super(SimpleMonitor13, self).__init__(*args, **kwargs)
     self.datapaths = {}
     self.monitor_thread = hub.spawn(self._monitor)
+    self.metrics = {}
+    self.deltas = {}
 
 # Fills controller table with currently connected switches (dynamic)
   @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
@@ -35,9 +39,12 @@ class SimpleMonitor13(simple_switch_13.SimpleSwitch13):
   def _monitor(self):
     sleep_timer = 30
     while True:
+      hub.sleep(sleep_timer)
       for dp in self.datapaths.values():
         self._request_stats(dp)
-      hub.sleep(sleep_timer)
+      self.periodic_print()
+      self.periodic_print_deltas()
+
 
   def _request_stats(self, datapath):
     # Log a debug message indicating that statistics requests are being sent to the specified datapath
@@ -59,18 +66,47 @@ class SimpleMonitor13(simple_switch_13.SimpleSwitch13):
   # Handle replies for each switch
   @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
   def _port_stats_reply_handler(self, ev):
-    switch_bandwidth = {}
-    body = ev.msg.body
-    # Header for console output 
-    self.logger.info('datapath port rx-pkts rx-bytes rx-error tx-pkts tx-bytes tx-error')
-    self.logger.info('---------------- -------- -------- -------- -------- -------- -------- --------')
+    switch_id = ev.msg.datapath.id
+    port_traffic = {}
     # Sorts replies for each switch by port number, iterates through them and prints
-    for stat in sorted(body, key=attrgetter('port_no')):
-      # self.logger.info('%03x %8x %8d %8d %8d %8d %8d %8d',
-      #                   ev.msg.datapath.id, stat.port_no,
-      #                   stat.rx_packets, stat.rx_bytes, stat.rx_errors,
-      #                   stat.tx_packets, stat.tx_bytes, stat.tx_errors)
-      # Is bandwidth tx + rx or just one og the two?
-      bandwidth = stat.rx_bytes + stat.tx_bytes
-      switch_bandwidth[port_no] = bandwidth
-      return switch_bandwidth
+    self.logger.debug("---------------------------")
+    self.logger.debug("Switch: %03x", switch_id)
+    for stat in sorted(ev.msg.body, key=attrgetter("port_no")):
+      total_traffic = stat.rx_bytes + stat.tx_bytes
+      port_traffic[stat.port_no] = total_traffic
+      # TODO if to discard giant port
+    for key in port_traffic.keys():
+      self.logger.debug("%8d: %8d", key, port_traffic.get(key))
+    self.logger.debug("---------------------------")
+    if(port_traffic != {}):
+      if(switch_id in self.metrics.keys()):
+        self.calculate_deltas(switch=switch_id, new_values=port_traffic)
+      if switch_id not in self.metrics.keys():
+        self.metrics[switch_id] = port_traffic
+      else:
+        self.metrics[switch_id].update(port_traffic)
+
+  def periodic_print(self):
+    print("Metric dict status: ")
+    for switch, port_traffic in self.metrics.items():
+      port1 = port_traffic[1]
+      port2 = port_traffic[2]
+      self.logger.info(f"Switch {switch}: port1 = {port1}, port2 = {port2}")
+      self.logger.info("-------------------")
+      
+  def periodic_print_deltas(self):
+    print("Deltas dict status: ")
+    for switch, port_traffic in self.deltas.items():
+      port1 = port_traffic[1]
+      port2 = port_traffic[2]
+      self.logger.info(f"Switch {switch}: delta_port1 = {port1}, delta_port2 = {port2}")
+      self.logger.info("-------------------")
+      
+  def calculate_deltas(self, switch, new_values):
+    old_values = self.metrics.get(switch)
+    # Casually fill switch_deltas with one of metric's value to avoid null
+    switch_deltas = copy.deepcopy(self.metrics[switch])
+    for port in new_values.keys():
+      switch_deltas[port] = new_values[port] - old_values[port]
+    
+    self.deltas[switch].update(switch_deltas)
