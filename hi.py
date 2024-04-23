@@ -17,17 +17,23 @@ class SDNController(app_manager.RyuApp):
         self.discover_topology()
 
     def discover_topology(self):
-        switch_list = get_switch(self, None)
-        switches = [switch.dp.id for switch in switch_list]
-        self.graph = {dpid: {} for dpid in switches}
+    switch_list = get_switch(self, None)
+    switches = [switch.dp.id for switch in switch_list]
+    self.graph = {dpid: {} for dpid in switches}
 
-        link_list = get_link(self, None)
-        for link in link_list:
-            src = link.src.dpid
-            dst = link.dst.dpid
-            self.graph[src][dst] = link
-            self.graph[dst][src] = link
-            self.graph[dst][src] = link
+    # Assuming a 3x3 torus topology
+    rows = 3
+    cols = 3
+    for switch in switch_list:
+        dpid = switch.dp.id
+        row = dpid // cols
+        col = dpid % cols
+        for i in range(rows):
+            for j in range(cols):
+                if i != row or j != col:
+                    neighbor_dpid = (row + i) % rows * cols + (col + j) % cols
+                    self.graph[dpid][neighbor_dpid] = True  # Assuming direct link
+
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
