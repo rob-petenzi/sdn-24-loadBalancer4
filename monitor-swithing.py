@@ -10,7 +10,7 @@ from ryu.lib import hub
 from operator import attrgetter
 import networkx as nx
 import copy
-from ryu.ofproto import inet
+from ryu.ofproto import inet, ether
 
 
 class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
@@ -90,15 +90,17 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         
         ip = pkt.get_protocol(ipv4.ipv4)
         
-        if ip.proto != ipv4.tcp:
-            match = parser.OFPMatch(eth_dst=destination_mac)
+        if ip.proto == 1:
+            match = parser.OFPMatch(eth_dst=destination_mac, eth_type=ether.ETH_TYPE_IP, ip_proto=inet.IPPROTO_ICMP)
             priority = 10
-        else:
+        elif ip.proto == 6:
             tcpinfo = pkt.get_protocol(tcp.tcp)
+            print(f"Matching for {ip.src} {ip.dst} {tcpinfo.src_port} {tcpinfo.dst_port}")
             priority = 20
-            match = parser.OFPMatch(eth_dst=destination_mac, ip_proto=inet.IPPROTO_TCP, ipv4_src=ip.src, ipv4_dst=ip.dst, tcp_src=tcpinfo.src_port, tcp_dst=tcpinfo.dst_port)
+            match = parser.OFPMatch(eth_dst=destination_mac, eth_type=ether.ETH_TYPE_IP, ip_proto=inet.IPPROTO_TCP, ipv4_src=str(ip.src), ipv4_dst=str(ip.dst), tcp_src=tcpinfo.src_port, tcp_dst=tcpinfo.dst_port)
             
-        
+        assert msg.buffer_id == ofproto.OFP_NO_BUFFER
+
 
         actions = [parser.OFPActionOutput(output_port)]
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id, in_port=in_port, actions=actions, data=msg.data)
@@ -116,25 +118,21 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         if switch_id in self.metrics:
             self.calculate_deltas(switch_id, port_traffic)
         self.metrics[switch_id] = port_traffic
-        self.periodic_print(switch_id)
-        self.periodic_print_deltas(switch_id)
+        # self.periodic_print(switch_id)
+        # self.periodic_print_deltas(switch_id)
 
     def calculate_deltas(self, switch, new_values):
         old_values = self.metrics.get(switch, {})
         switch_deltas = {port: new_values[port] - old_values.get(port, 0) for port in new_values}
         self.deltas[switch] = switch_deltas
+        
+           
 
     def periodic_print(self, switch):
         print("##########################")
         print("### Metric dict status for Switch {} ###".format(switch))
         print("##########################")
-
-        port_traffic_items = iter(self.metrics[switch].items())  # Create an iterator over the dictionary items
-        next(port_traffic_items, None)  # Skip the first entry
-
         for port, traffic in self.metrics[switch].items():
-            if port > 100:
-                continue  # Skip the print statement if the port number is greater than 100
             print("Port {}: {}".format(port, traffic))
         print("\n")
 
@@ -143,8 +141,6 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         print("### Deltas dict status for Switch {} ###".format(switch))
         print("##########################")
         for port, delta in self.deltas[switch].items():
-            if port > 100:
-                continue  # Skip the print statement if the port number is greater than 100
             print("Delta Port {}: {}".format(port, delta))
         print("\n")
 
@@ -188,8 +184,12 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
 
     def find_next_hop_to_destination(self, source_id, destination_id):
         net = nx.DiGraph()
+        edge_weights =  {}
         for link in get_all_link(self):
             net.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no, weight=self.deltas[link.src.dpid].get(link.src.port_no))
-        path = nx.shortest_path(net, source_id, destination_id)
+            edge_weights[link.src.dpid, link.dst.dpid] = self.deltas[link.src.dpid].get(link.src.port_no)
+            nx.set_edge_attributes(net, edge_weights, name='weight')
+            
+        path = nx.shortest_path(net, source_id, destination_id, weight='weight')     
         first_link = net[path[0]][path[1]]
         return first_link['port']
