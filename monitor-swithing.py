@@ -95,7 +95,10 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
             priority = 10
         elif ip.proto == 6:
             tcpinfo = pkt.get_protocol(tcp.tcp)
-            print(f"Matching for {ip.src} {ip.dst} {tcpinfo.src_port} {tcpinfo.dst_port}")
+            if dst_dpid != datapath.id:
+                print(f"\nMatching for {ip.src} {ip.dst} {tcpinfo.src_port} {tcpinfo.dst_port}")
+                print(f"Datapath n{datapath.id} output on port n.{output_port} towards Datapath n.{dst_dpid}")
+                self.periodic_print_deltas(datapath.id)
             priority = 20
             match = parser.OFPMatch(eth_dst=destination_mac, eth_type=ether.ETH_TYPE_IP, ip_proto=inet.IPPROTO_TCP, ipv4_src=str(ip.src), ipv4_dst=str(ip.dst), tcp_src=tcpinfo.src_port, tcp_dst=tcpinfo.dst_port)
             
@@ -137,12 +140,13 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         print("\n")
 
     def periodic_print_deltas(self, switch):
-        print("##########################")
+        print("----------------------------------------")
         print("### Deltas dict status for Switch {} ###".format(switch))
-        print("##########################")
+        print("----------------------------------------")
         for port, delta in self.deltas[switch].items():
-            print("Delta Port {}: {}".format(port, delta))
-        print("\n")
+            if port < 10:
+                print("Delta Port {}: {}".format(port, delta))
+        # print("\n")
 
     def proxy_arp(self, msg):
         datapath = msg.datapath
@@ -185,10 +189,14 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
     def find_next_hop_to_destination(self, source_id, destination_id):
         net = nx.DiGraph()
         edge_weights =  {}
+        # print("-----------------------------------------------------")
+        # print("Switch SRC|     Switch DST    |    Weight   ")
+        # print("-----------------------------------------------------")
         for link in get_all_link(self):
             net.add_edge(link.src.dpid, link.dst.dpid, port=link.src.port_no, weight=self.deltas[link.src.dpid].get(link.src.port_no))
             edge_weights[link.src.dpid, link.dst.dpid] = self.deltas[link.src.dpid].get(link.src.port_no)
             nx.set_edge_attributes(net, edge_weights, name='weight')
+            # print(f"\t\t{link.src.dpid}\t\t\t\t{link.dst.dpid}      {self.deltas[link.src.dpid].get(link.src.port_no)}")
             
         path = nx.shortest_path(net, source_id, destination_id, weight='weight')     
         first_link = net[path[0]][path[1]]

@@ -17,19 +17,19 @@ class TBTopo(Topo):
         SDN_switch5 = self.addSwitch("s5")
         SDN_switch6 = self.addSwitch("s6")
         
-        self.addLink(server, SDN_switch1, port2 = 1)
-        self.addLink(minihost1, SDN_switch6, port2 = 1)
-        self.addLink(minihost2, SDN_switch6, port2 = 2)
-        self.addLink(minihost3, SDN_switch6, port2 = 3)
-        self.addLink(minihost4, SDN_switch6, port2 = 4)
+        self.addLink(server, SDN_switch1, port2 = 10)
+        self.addLink(minihost1, SDN_switch6, port2 = 11)
+        self.addLink(minihost2, SDN_switch6, port2 = 12)
+        self.addLink(minihost3, SDN_switch6, port2 = 13)
+        self.addLink(minihost4, SDN_switch6, port2 = 14)
                 
         self.addLink(SDN_switch1, SDN_switch2, 2, 1)
         self.addLink(SDN_switch1, SDN_switch3, 3, 1)
         self.addLink(SDN_switch1, SDN_switch4, 4, 1)
         self.addLink(SDN_switch1, SDN_switch5, 5, 1)
-        self.addLink(SDN_switch6, SDN_switch2, 5, 2)
-        self.addLink(SDN_switch6, SDN_switch3, 6, 2)
-        self.addLink(SDN_switch6, SDN_switch4, 7, 2)
-        self.addLink(SDN_switch6, SDN_switch5, 8, 2)
+        self.addLink(SDN_switch6, SDN_switch2, 2, 2)
+        self.addLink(SDN_switch6, SDN_switch3, 3, 2)
+        self.addLink(SDN_switch6, SDN_switch4, 4, 2)
+        self.addLink(SDN_switch6, SDN_switch5, 5, 2)
         
 topos = { 'TBTopo' : ( lambda: TBTopo() ) }
