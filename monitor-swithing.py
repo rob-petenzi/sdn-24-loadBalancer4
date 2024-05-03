@@ -22,6 +22,7 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
         self.monitor_thread = hub.spawn(self._monitor)
         self.metrics = {}
         self.deltas = {}
+        self.switches = {}
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -39,11 +40,19 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
             if datapath.id not in self.datapaths:
                 self.logger.debug('register datapath: %016x', datapath.id)
                 self.datapaths[datapath.id] = datapath
+                self._id_switch_translator()
         elif ev.state == DEAD_DISPATCHER:
             if datapath.id in self.datapaths:
                 self.logger.debug('unregister datapath: %016x', datapath.id)
                 del self.datapaths[datapath.id]
+                self._id_switch_translator()
 
+    def _id_switch_translator(self):
+        self.switches = {}
+        ids = sorted(self.datapaths.keys())
+        for i in range(0, ids.__len__):
+            self.switches[ids[i]] = i
+    
     def _monitor(self):
         sleep_timer = 10
         while True:
@@ -198,6 +207,8 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
             nx.set_edge_attributes(net, edge_weights, name='weight')
             # print(f"\t\t{link.src.dpid}\t\t\t\t{link.dst.dpid}      {self.deltas[link.src.dpid].get(link.src.port_no)}")
             
-        path = nx.shortest_path(net, source_id, destination_id, weight='weight')     
+        path = nx.shortest_path(net, source_id, destination_id, weight='weight')
+        for i in range(0, path.__len__):
+            print(self.switches[path[i]] + " -> ")
         first_link = net[path[0]][path[1]]
         return first_link['port']
