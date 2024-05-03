@@ -50,7 +50,7 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
     def _id_switch_translator(self):
         self.switches = {}
         ids = sorted(self.datapaths.keys())
-        for i in range(0, ids.__len__):
+        for i in range(0, len(ids)):
             self.switches[ids[i]] = i
     
     def _monitor(self):
@@ -208,7 +208,7 @@ class EnhancedHopByHopSwitch(simple_switch_13.SimpleSwitch13):
             # print(f"\t\t{link.src.dpid}\t\t\t\t{link.dst.dpid}      {self.deltas[link.src.dpid].get(link.src.port_no)}")
             
         path = nx.shortest_path(net, source_id, destination_id, weight='weight')
-        for i in range(0, path.__len__):
+        for i in range(0, len(path)):
             print(self.switches[path[i]] + " -> ")
         first_link = net[path[0]][path[1]]
         return first_link['port']
